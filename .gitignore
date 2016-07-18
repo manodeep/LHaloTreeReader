@@ -21,6 +21,7 @@
 *.dylib
 
 # Executables
+read_lhalotree
 *.exe
 *.out
 *.app
