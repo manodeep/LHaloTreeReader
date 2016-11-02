@@ -2,6 +2,12 @@
 #include <stdlib.h>
 #include <inttypes.h>
 
+#include<time.h>
+
+#ifdef __MACH__ // OS X does not have clock_gettime, use clock_get_time
+#include <mach/mach_time.h> /* mach_absolute_time -> really fast */
+#endif
+
 #include "utils.h"
 
 void * my_malloc(size_t size, uint64_t N)
@@ -51,4 +57,41 @@ int my_fseek(FILE *stream, long offset, int whence)
     }
     return err;
 }
+
+
+/*
+  Can not remember where I (MS) got this from. Fairly sure
+  stackoverflow was involved.
+  Finally taken from http://stackoverflow.com/a/6719178/2237582 */
+void current_utc_time(struct timespec *ts)
+{
+
+#ifdef __MACH__ // OS X does not have clock_gettime, use clock_get_time
+    static mach_timebase_info_data_t    sTimebaseInfo = {.numer=0, .denom=0};
+    uint64_t start = mach_absolute_time();
+    if ( sTimebaseInfo.denom == 0 ) {
+        mach_timebase_info(&sTimebaseInfo);
+    }
+
+    ts->tv_sec = 0;//(start * sTimebaseInfo.numer/sTimebaseInfo.denom) * tv_nsec;
+    ts->tv_nsec = start * sTimebaseInfo.numer / sTimebaseInfo.denom;
+
+#if 0
+    //Much slower implementation for clock
+    //Slows down the code by up to 4x
+    clock_serv_t cclock;
+    mach_timespec_t mts;
+    host_get_clock_service(mach_host_self(), CALENDAR_CLOCK, &cclock);
+    clock_get_time(cclock, &mts);
+    mach_port_deallocate(mach_task_self(), cclock);
+    ts->tv_sec = mts.tv_sec;
+    ts->tv_nsec = mts.tv_nsec;
+#endif
+
+#else
+    //On linux, simply call clock_gettime (link with -lrt, for real-time library)
+    clock_gettime(CLOCK_REALTIME, ts);
+#endif
+}
+
 

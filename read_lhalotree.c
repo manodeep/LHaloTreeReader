@@ -1,7 +1,11 @@
+#define _FILE_OFFSET_BITS 64
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <inttypes.h>
 #include <string.h>
+#include <unistd.h> //for pread
+#include <sys/types.h> //for off_t
 
 #include "utils.h"
 #include "read_lhalotree.h"
@@ -16,6 +20,65 @@ int32_t read_ntrees_lhalotree(const char *filename)
 
     return ntrees;
 }
+
+/* Written with tree as a parameter to avoid malloc'ing repeatedly within the function */
+size_t read_single_lhalotree_from_stream(FILE *fp, struct output_dtype *tree, const int32_t nhalos)
+{
+    return my_fread(tree, sizeof(*tree), nhalos, fp);
+}
+
+int pread_single_lhalotree_with_offset(int fd, struct output_dtype *tree, const int32_t nhalos, off_t offset)
+{
+    size_t bytes_to_read = sizeof(*tree) * nhalos;
+    ssize_t bytes_left = bytes_to_read;
+    size_t curr_offset=0;
+    while(bytes_left > 0) {
+        ssize_t bytes_read = pread(fd, tree + curr_offset, bytes_left, offset);
+        if(bytes_read < 0) {
+            fprintf(stderr,"Read error\n");
+            perror(NULL);
+            return -1;
+        }
+        offset += bytes_read;
+        curr_offset += bytes_read/sizeof(*tree);
+        bytes_left -= bytes_read;
+    }
+
+    /* I could return bytes_to_read but returning this serves as an independent check that
+       too much data was not read. 
+     */
+
+    if((curr_offset * sizeof(*tree)) != bytes_to_read) {
+        return -1;
+    }
+    
+    return EXIT_SUCCESS;
+}
+
+int read_file_headers_lhalotree(const char *filename, int32_t *ntrees, int32_t *totnhalos, int32_t **nhalos_per_tree)
+{
+    int status=EXIT_SUCCESS;
+    FILE *fp = my_fopen(filename,"r");
+    size_t nitems = my_fread(ntrees, sizeof(*ntrees), 1, fp);
+    if(nitems != 1) {
+        status = EXIT_FAILURE;
+    }
+    nitems = my_fread(totnhalos, sizeof(*totnhalos), 1, fp);
+    if(nitems != 1) {
+        status = EXIT_FAILURE;
+    }
+    *nhalos_per_tree = my_malloc(sizeof(**nhalos_per_tree), (uint64_t) *ntrees);
+    if(*nhalos_per_tree == NULL) {
+        status = EXIT_FAILURE;
+    } else {
+        my_fread(*nhalos_per_tree, sizeof(**nhalos_per_tree), *ntrees, fp);
+    }
+    fclose(fp);
+    
+    return status;
+}
+
+
 
 
 struct output_dtype * read_entire_lhalotree(const char *filename, int32_t *ntrees, int32_t *totnhalos, int32_t **nhalos_per_tree)
@@ -50,7 +113,7 @@ struct output_dtype * read_single_lhalotree(const char *filename, const int32_t 
 {
     /*
       Implementation for reading a single tree out of an LHaloTree file
-      (Since the file is opened and closed repeatedly - this routine iss very inefficient if many trees are to be read)
+      (Since the file is opened and closed repeatedly - this routine is very inefficient if many trees are to be read)
     */
 
     FILE *fp = my_fopen(filename, "r");
