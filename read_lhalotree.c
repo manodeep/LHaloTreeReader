@@ -1,77 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <inttypes.h>
-#include <assert.h>
 #include <string.h>
 
-/* Definition of the LHaloTree struct */
-#include "datatype.h"
-
-/* Helper function proto-types*/
-void * my_malloc(size_t size, uint64_t N) __attribute__((malloc, alloc_size(1,2)));
-size_t my_fread(void *ptr, size_t size, size_t nmemb, FILE *stream);
-FILE * my_fopen(const char *fname,const char *mode);
-int my_fseek(FILE *stream, long offset, int whence);
-void usage(int argc, char **argv);
-
-/* Actual useful functions*/
-struct output_dtype * read_entire_lhalotree(const char *filename, int *ntrees, int *totnhalos, int **nhalos_per_tree);
-struct output_dtype * read_single_lhalotree(const char *filename, const int32_t treenum);
-
-void * my_malloc(size_t size, uint64_t N)
-{
-    void *x = NULL;
-    x = malloc(N*size);
-    if (x==NULL){
-        fprintf(stderr,"malloc for %"PRId64" elements with %zu bytes failed..aborting\n",N,size);
-        perror(NULL);
-        exit(EXIT_FAILURE);
-    }
-        
-    return x;
-}
-
-FILE * my_fopen(const char *fname,const char *mode)
-{
-    FILE *fp=NULL;
-    fp = fopen(fname,mode);
-    if(fp == NULL) {
-        fprintf(stderr,"Could not open file `%s'\n",fname);
-        perror(NULL);
-        exit(EXIT_FAILURE);
-    }
-    return fp;
-}
-
-size_t my_fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
-{
-    size_t nread;
-    nread = fread(ptr, size, nmemb, stream);
-    if(nread != nmemb) {
-        fprintf(stderr,"I/O error (fread) has occured.\n");
-        fprintf(stderr,"Instead of reading nmemb=%zu, I got nread = %zu ..exiting\n",nmemb,nread);
-        perror(NULL);
-        exit(EXIT_FAILURE);
-    }
-    return nread;
-}
-
-int my_fseek(FILE *stream, long offset, int whence)
-{
-    int err=fseek(stream,offset,whence);
-    if(err != 0) {
-        fprintf(stderr,"ERROR: Could not seek `%ld' bytes into the file..exiting\n",offset);
-        exit(EXIT_FAILURE);
-    }
-    return err;
-}
-
-void usage(int argc, char **argv)
-{
-    (void) argc;
-    fprintf(stderr,"USAGE: `%s' <lhalotree file>\n",argv[0]);
-}    
+#include "utils.h"
+#include "read_lhalotree.h"
 
 struct output_dtype * read_entire_lhalotree(const char *filename, int32_t *ntrees, int32_t *totnhalos, int32_t **nhalos_per_tree)
 {
@@ -155,58 +88,3 @@ struct output_dtype * read_single_lhalotree(const char *filename, const int32_t 
 }    
 
 
-int main(int argc, char **argv)
-{
-    if(argc != 2) {
-        usage(argc, argv);
-        fprintf(stderr,"exiting\n");
-        exit(EXIT_FAILURE);
-    }
-
-    char *filename = argv[1];
-    int32_t ntrees=0;
-    int32_t totnhalos = 0;
-    int32_t *nhalos_per_tree=NULL;
-    struct output_dtype *all_trees = read_entire_lhalotree(filename, &ntrees, &totnhalos, &nhalos_per_tree);
-
-#if 0    
-    /*
-      An example for looping over all the trees and each halo within a tree
-     */
-    size_t offset = 0;
-    for(int itree=0;itree<ntrees;itree++) {
-        const int nhalos = nhalos_per_tree[itree];
-        const struct output_dtype *tree  = &(all_trees[offset]);
-        for(int i=0;i<nhalos;i++) {
-            const struct output_dtype halo = tree[i];
-            fprintf(stderr,"In tree=%d, halo=%d has Mvir = %lf and MostBoundID = %lld\n", itree, i, halo.Mvir, halo.MostBoundID);
-        }
-        offset += (size_t) nhalos;
-    }
-#endif
-    
-    //Read the first tree in the file -> should be identical to all_trees[0:nhalos-1]
-    //the parameters.
-    //Change to a random tree number within range to check 
-    const int32_t treenum = 190;
-    struct output_dtype *first = read_single_lhalotree(filename, treenum);
-    
-    //Run some validation
-    size_t offset = 0;
-    for(int32_t i=0;i<treenum;i++) {
-        offset += nhalos_per_tree[i];
-    }
-    const struct output_dtype *second = all_trees + offset;
-    int exit_status = memcmp(first, second, sizeof(struct output_dtype)*nhalos_per_tree[treenum]);
-    if(exit_status == 0) {
-        fprintf(stderr,"Validation PASSED. treenum = %d read by the two different routines match. \n", treenum);
-    } else {
-        fprintf(stderr,"ERROR: Validation FAILED. For treenum = %d, the trees read by the two different routines. Bug in code\n", treenum);
-    }
-    free(first);
-    free(nhalos_per_tree);
-    free(all_trees);
-    
-    return exit_status;
-}    
-    

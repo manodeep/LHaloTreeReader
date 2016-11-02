@@ -1,7 +1,7 @@
 TARGET := read_lhalotree
-SRC := read_lhalotree.c
+SRC := main.c read_lhalotree.c utils.c 
 OBJS :=  $(SRC:.c=.o)
-INCL := datatype.h
+INCL := read_lhalotree.h datatype.h utils.h
 
 # Compiling to object
 CC := gcc
