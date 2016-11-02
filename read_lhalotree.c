@@ -6,6 +6,18 @@
 #include "utils.h"
 #include "read_lhalotree.h"
 
+
+int32_t read_ntrees_lhalotree(const char *filename)
+{
+    int32_t ntrees;
+    FILE *fp = my_fopen(filename,"r");
+    my_fread(&ntrees, sizeof(ntrees), 1, fp);
+    fclose(fp);
+
+    return ntrees;
+}
+
+
 struct output_dtype * read_entire_lhalotree(const char *filename, int32_t *ntrees, int32_t *totnhalos, int32_t **nhalos_per_tree)
 {
     /*
