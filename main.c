@@ -28,7 +28,7 @@ int main(int argc, char **argv)
     int32_t ntrees=0;
     int32_t totnhalos = 0;
     int32_t *nhalos_per_tree=NULL;
-    struct output_dtype *all_trees = read_entire_lhalotree(filename, &ntrees, &totnhalos, &nhalos_per_tree);
+    struct lhalotree *all_trees = read_entire_lhalotree(filename, &ntrees, &totnhalos, &nhalos_per_tree);
 
 #if 0    
     /*
@@ -37,9 +37,9 @@ int main(int argc, char **argv)
     size_t offset = 0;
     for(int itree=0;itree<ntrees;itree++) {
         const int nhalos = nhalos_per_tree[itree];
-        const struct output_dtype *tree  = &(all_trees[offset]);
+        const struct lhalotree *tree  = &(all_trees[offset]);
         for(int i=0;i<nhalos;i++) {
-            const struct output_dtype halo = tree[i];
+            const struct lhalotree halo = tree[i];
             fprintf(stderr,"In tree=%d, halo=%d has Mvir = %lf and MostBoundID = %lld\n", itree, i, halo.Mvir, halo.MostBoundID);
         }
         offset += (size_t) nhalos;
@@ -53,7 +53,7 @@ int main(int argc, char **argv)
 
     struct timespec t0, t1;
     current_utc_time(&t0);
-    struct output_dtype *first = read_single_lhalotree(filename, treenum);
+    struct lhalotree *first = read_single_lhalotree(filename, treenum);
     current_utc_time(&t1);
     
     
@@ -62,8 +62,8 @@ int main(int argc, char **argv)
     for(int32_t i=0;i<treenum;i++) {
         offset += nhalos_per_tree[i];
     }
-    const struct output_dtype *second = all_trees + offset;
-    int exit_status = memcmp(first, second, sizeof(struct output_dtype)*nhalos_per_tree[treenum]);
+    const struct lhalotree *second = all_trees + offset;
+    int exit_status = memcmp(first, second, sizeof(struct lhalotree)*nhalos_per_tree[treenum]);
     if(exit_status == 0) {
         fprintf(stderr,"Validation PASSED. treenum = %d read by the two different routines match. Time = %e ns\n", treenum, REALTIME_ELAPSED_NS(t0, t1));
     } else {
@@ -82,13 +82,13 @@ int main(int argc, char **argv)
     const size_t offset_for_tree =  sizeof(int32_t) /* ntrees */
         + sizeof(int32_t)                           /* totnhalos */
         + sizeof(int32_t)*ntrees                    /* nhalos_per_tree */
-        + offset*sizeof(struct output_dtype);
+        + offset*sizeof(struct lhalotree);
 
     current_utc_time(&t0);
     exit_status |= (pread_single_lhalotree_with_offset(fd, first, nhalos_per_tree[treenum], offset_for_tree)) << 8;
     current_utc_time(&t1);
     
-    int cmp_status = memcmp(first, second, sizeof(struct output_dtype)*nhalos_per_tree[treenum]);
+    int cmp_status = memcmp(first, second, sizeof(struct lhalotree)*nhalos_per_tree[treenum]);
     if(cmp_status == 0) {
         fprintf(stderr,"Validation PASSED. treenum = %d read by the two different routines match. Time = %e ns \n", treenum, REALTIME_ELAPSED_NS(t0, t1));
     } else {
