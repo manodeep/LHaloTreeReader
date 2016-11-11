@@ -9,10 +9,26 @@ extern "C" {
 struct lhalotree
 {
     // merger tree pointers
-    int Descendant;
-    int FirstProgenitor;
-    int NextProgenitor;
-    int FirstHaloInFOFgroup;
+    //Points to the future
+    union {
+        int Descendant;
+        int Parent;//HINGE lingo (well, almost. in HINGE this is a pointer rather than an index)
+    };
+    union{
+        int FirstProgenitor;
+        int BigChild;//in the past
+    };
+    
+    union{
+        int NextProgenitor;
+        int Sibling;//At the same snapshot
+    };
+    
+    union{
+        int FirstHaloInFOFgroup;
+        int MostMassiveHost;//in keeping with Consistent-Trees style (for uparent)
+    };
+    
     int NextHaloInFOFgroup;
 
     // properties of halo
