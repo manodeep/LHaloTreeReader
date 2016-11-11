@@ -6,7 +6,7 @@ extern "C" {
 
 #include <stdio.h>
     
-struct output_dtype
+struct lhalotree
 {
     // merger tree pointers
     int Descendant;

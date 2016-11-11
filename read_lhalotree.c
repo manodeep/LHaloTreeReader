@@ -22,12 +22,12 @@ int32_t read_ntrees_lhalotree(const char *filename)
 }
 
 /* Written with tree as a parameter to avoid malloc'ing repeatedly within the function */
-size_t read_single_lhalotree_from_stream(FILE *fp, struct output_dtype *tree, const int32_t nhalos)
+size_t read_single_lhalotree_from_stream(FILE *fp, struct lhalotree *tree, const int32_t nhalos)
 {
     return my_fread(tree, sizeof(*tree), nhalos, fp);
 }
 
-int pread_single_lhalotree_with_offset(int fd, struct output_dtype *tree, const int32_t nhalos, off_t offset)
+int pread_single_lhalotree_with_offset(int fd, struct lhalotree *tree, const int32_t nhalos, off_t offset)
 {
     size_t bytes_to_read = sizeof(*tree) * nhalos;
     ssize_t bytes_left = bytes_to_read;
@@ -81,7 +81,7 @@ int read_file_headers_lhalotree(const char *filename, int32_t *ntrees, int32_t *
 
 
 
-struct output_dtype * read_entire_lhalotree(const char *filename, int32_t *ntrees, int32_t *totnhalos, int32_t **nhalos_per_tree)
+struct lhalotree * read_entire_lhalotree(const char *filename, int32_t *ntrees, int32_t *totnhalos, int32_t **nhalos_per_tree)
 {
     /*
       A simple reader (with error-checking) for standard LHaloTree binary files
@@ -91,7 +91,7 @@ struct output_dtype * read_entire_lhalotree(const char *filename, int32_t *ntree
       4 bytes                      |   1                     | ntrees     (number of trees in this file)
       4 bytes                      |   1                     | totnhalos  (total number of halos summer over all trees in this file)
       4 bytes                      |   ntrees                | nhalos_per_tree (number of halos in *each* tree in this file)
-      sizeof(struct output_dtype)  |   totnhalos             | all_trees   (all the halos in this file, should be parsed one tree at a time)
+      sizeof(struct lhalotree)  |   totnhalos             | all_trees   (all the halos in this file, should be parsed one tree at a time)
 
      */
 
@@ -101,7 +101,7 @@ struct output_dtype * read_entire_lhalotree(const char *filename, int32_t *ntree
     my_fread(totnhalos, sizeof(*totnhalos), 1, fp);
     *nhalos_per_tree = my_malloc(sizeof(**nhalos_per_tree), (uint64_t) *ntrees);
     my_fread(*nhalos_per_tree, sizeof(**nhalos_per_tree), *ntrees, fp);
-    struct output_dtype *all_trees = my_malloc(sizeof(*all_trees), *totnhalos);
+    struct lhalotree *all_trees = my_malloc(sizeof(*all_trees), *totnhalos);
     my_fread(all_trees, sizeof(*all_trees), *totnhalos, fp);
     fclose(fp);
 
@@ -109,7 +109,7 @@ struct output_dtype * read_entire_lhalotree(const char *filename, int32_t *ntree
 }    
 
 
-struct output_dtype * read_single_lhalotree(const char *filename, const int32_t treenum)
+struct lhalotree * read_single_lhalotree(const char *filename, const int32_t treenum)
 {
     /*
       Implementation for reading a single tree out of an LHaloTree file
@@ -149,12 +149,12 @@ struct output_dtype * read_single_lhalotree(const char *filename, const int32_t 
     my_fseek(fp, bytes_to_tree, SEEK_SET);//look closely -> set from the beginning of the file. Then, I don't have to worry about off-by-one errors
 
     //Now seek to the halos in the actual tree wanted
-    my_fseek(fp, (long) (sizeof(struct output_dtype)*nhalos_before_this_tree), SEEK_CUR);//This fseek is relative. 
+    my_fseek(fp, (long) (sizeof(struct lhalotree)*nhalos_before_this_tree), SEEK_CUR);//This fseek is relative. 
 
     //Essentially, if there was already a valid stream, then
     //this would be the body of the function for returning
     //the tree i) file pointer is correctly positioned ii) nhalos is known
-    struct output_dtype *tree = my_malloc(sizeof(*tree), nhalos);
+    struct lhalotree *tree = my_malloc(sizeof(*tree), nhalos);
     my_fread(tree, sizeof(*tree), nhalos, fp);
 
     fclose(fp);
