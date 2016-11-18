@@ -1,7 +1,7 @@
 TARGET := read_lhalotree
-SRC := main.c read_lhalotree.c utils.c 
+SRC := main.c read_lhalotree.c utils.c progressbar.c
 OBJS :=  $(SRC:.c=.o)
-INCL := read_lhalotree.h datatype.h utils.h
+INCL := read_lhalotree.h utils.h sglib.h progressbar.h Makefile lhalotree.h
 
 # Compiling to object
 CC := gcc
@@ -13,12 +13,14 @@ CFLAGS  += -Wnested-externs -Wstrict-prototypes
 OPTIMIZE := -O3 -march=native
 
 # Linking (remove -lrt, real-time library flag, on OSX)
-LDFLAGS := -lrt
+LDFLAGS := -lrt -lm
 
-%.o: %.c Makefile $(INCL)
+all: $(TARGET) $(SRC) $(OBJS) $(INCL) Makefile
+
+%.o: %.c $(INCL)
 	$(CC) $(OPTIMIZE) $(CFLAGS) -c $< -o $@
 
-$(TARGET): $(OBJS) 
+$(TARGET): $(OBJS)
 	$(CC) $^ -o $@ $(LDFLAGS)
 
 .phony: clean celan celna

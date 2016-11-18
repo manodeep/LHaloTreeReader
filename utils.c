@@ -3,6 +3,10 @@
 #include <inttypes.h>
 
 #include<time.h>
+#include<sys/time.h>
+#include<math.h>
+#include<stdarg.h>
+#include <string.h>
 
 #ifdef __MACH__ // OS X does not have clock_gettime, use clock_get_time
 #include <mach/mach_time.h> /* mach_absolute_time -> really fast */
@@ -57,6 +61,64 @@ int my_fseek(FILE *stream, long offset, int whence)
     }
     return err;
 }
+
+// A real wrapper to snprintf that will exit() if the allocated buffer length
+// was not sufficient. Usage is the same as snprintf
+
+int my_snprintf(char *buffer,int len,const char *format, ...)
+{
+    va_list args;
+    int nwritten=0;
+
+    va_start(args,format);
+    nwritten=vsnprintf(buffer, (size_t) len, format, args );
+    va_end(args);
+    if (nwritten > len || nwritten < 0) {
+        fprintf(stderr,"ERROR: printing to string failed (wrote %d characters while only %d characters were allocated)\n",nwritten,len);
+        fprintf(stderr,"Increase `len'=%d in the header file\n",len);
+        return -1;
+    }
+    return nwritten;
+}
+
+
+char * get_time_string(struct timeval t0,struct timeval t1)
+{
+  const size_t MAXLINESIZE = 1024;
+  char *time_string = my_malloc(sizeof(char), MAXLINESIZE);
+  double timediff = t1.tv_sec - t0.tv_sec;
+  double ratios[] = {24*3600.0,  3600.0,  60.0,  1};
+  char units[4][10]  = {"days", "hrs" , "mins", "secs"};
+  int which = 0;
+
+  double timeleft = timediff;
+  double time_to_print;
+  
+  if(timediff < ratios[2]) {
+    my_snprintf(time_string, MAXLINESIZE,"%6.3lf secs",1e-6*(t1.tv_usec-t0.tv_usec) + timediff);
+  }  else {
+    size_t curr_index = 0;
+    while (which < 4) {
+      time_to_print = floor(timeleft/ratios[which]);
+      if (time_to_print > 1) {
+        timeleft -= (time_to_print*ratios[which]);
+        char tmp[MAXLINESIZE];
+        my_snprintf(tmp, MAXLINESIZE, "%5d %s",(int)time_to_print,units[which]);
+        const size_t len = strlen(tmp);
+        const size_t required_len = curr_index + len + 1;
+        XRETURN(MAXLINESIZE >= required_len, NULL,
+                "buffer overflow will occur: string has space for %zu bytes while concatenating requires at least %zu bytes\n",
+                MAXLINESIZE, required_len);
+        strcpy(time_string + curr_index, tmp);
+        curr_index += len;
+      }
+      which++;
+    }
+  }
+
+  return time_string;
+}
+
 
 
 /*

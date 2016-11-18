@@ -13,6 +13,7 @@
 
 #include "utils.h"
 #include "read_lhalotree.h"
+#include "progressbar.h"
 
 void usage(int argc, char **argv);
 
@@ -28,22 +29,27 @@ int main(int argc, char **argv)
     int32_t ntrees=0;
     int32_t totnhalos = 0;
     int32_t *nhalos_per_tree=NULL;
-    struct output_dtype *all_trees = read_entire_lhalotree(filename, &ntrees, &totnhalos, &nhalos_per_tree);
-
-#if 0    
+    struct lhalotree *all_trees = read_entire_lhalotree(filename, &ntrees, &totnhalos, &nhalos_per_tree);
+    int interrupted=0;//for progressbar
+    size_t offset;
+    
+#if 0
     /*
       An example for looping over all the trees and each halo within a tree
      */
-    size_t offset = 0;
+    offset = 0;
+    init_my_progressbar(ntrees, &interrupted);
     for(int itree=0;itree<ntrees;itree++) {
+        my_progressbar(itree, &interrupted);
         const int nhalos = nhalos_per_tree[itree];
-        const struct output_dtype *tree  = &(all_trees[offset]);
+        const struct lhalotree *tree  = &(all_trees[offset]);
         for(int i=0;i<nhalos;i++) {
-            const struct output_dtype halo = tree[i];
+            const struct lhalotree halo = tree[i];
             fprintf(stderr,"In tree=%d, halo=%d has Mvir = %lf and MostBoundID = %lld\n", itree, i, halo.Mvir, halo.MostBoundID);
         }
         offset += (size_t) nhalos;
     }
+    finish_myprogressbar(&interrupted);
 #endif
     
     //Read the first tree in the file -> should be identical to all_trees[0:nhalos-1]
@@ -53,21 +59,21 @@ int main(int argc, char **argv)
 
     struct timespec t0, t1;
     current_utc_time(&t0);
-    struct output_dtype *first = read_single_lhalotree(filename, treenum);
+    struct lhalotree *first = read_single_lhalotree(filename, treenum);
     current_utc_time(&t1);
     
     
     //Run some validation
-    size_t offset = 0;
+    offset = 0;
     for(int32_t i=0;i<treenum;i++) {
         offset += nhalos_per_tree[i];
     }
-    const struct output_dtype *second = all_trees + offset;
-    int exit_status = memcmp(first, second, sizeof(struct output_dtype)*nhalos_per_tree[treenum]);
+    const struct lhalotree *second = all_trees + offset;
+    int exit_status = memcmp(first, second, sizeof(struct lhalotree)*nhalos_per_tree[treenum]);
     if(exit_status == 0) {
         fprintf(stderr,"Validation PASSED. treenum = %d read by the two different routines match. Time = %e ns\n", treenum, REALTIME_ELAPSED_NS(t0, t1));
     } else {
-        fprintf(stderr,"ERROR: Validation FAILED. For treenum = %d, the trees read by the two different routines. Bug in code\n", treenum);
+        fprintf(stderr,"ERROR: Validation FAILED. For treenum = %d, the trees read by the two different routines. Bug in code (read_single_lhalotree)\n", treenum);
     }
 
     //Now check with pread. First zero out the tree 
@@ -82,21 +88,60 @@ int main(int argc, char **argv)
     const size_t offset_for_tree =  sizeof(int32_t) /* ntrees */
         + sizeof(int32_t)                           /* totnhalos */
         + sizeof(int32_t)*ntrees                    /* nhalos_per_tree */
-        + offset*sizeof(struct output_dtype);
+        + offset*sizeof(struct lhalotree);
 
     current_utc_time(&t0);
     exit_status |= (pread_single_lhalotree_with_offset(fd, first, nhalos_per_tree[treenum], offset_for_tree)) << 8;
     current_utc_time(&t1);
     
-    int cmp_status = memcmp(first, second, sizeof(struct output_dtype)*nhalos_per_tree[treenum]);
+    int cmp_status = memcmp(first, second, sizeof(struct lhalotree)*nhalos_per_tree[treenum]);
     if(cmp_status == 0) {
         fprintf(stderr,"Validation PASSED. treenum = %d read by the two different routines match. Time = %e ns \n", treenum, REALTIME_ELAPSED_NS(t0, t1));
     } else {
-        fprintf(stderr,"ERROR: Validation FAILED. For treenum = %d, the trees read by the two different routines. Bug in code\n", treenum);
+        fprintf(stderr,"ERROR: Validation FAILED. For treenum = %d, the trees read by the two different routines. Bug in code (pread_single_lhalotree_with_offset)\n", treenum);
     }
     exit_status |= cmp_status << 16;
-    close(fd);
+    /* close(fd); */
 
+
+    interrupted=0;
+    init_my_progressbar(ntrees, &interrupted);
+    offset = 0;
+    for(int32_t itree=0;itree < ntrees;itree++) {
+        my_progressbar(itree, &interrupted);
+        const int nhalos = nhalos_per_tree[itree];
+        struct lhalotree *third = my_malloc(sizeof(struct lhalotree),  nhalos);
+        const size_t tree_offset = sizeof(int32_t) /* ntrees */
+            + sizeof(int32_t)                           /* totnhalos */
+            + sizeof(int32_t)*ntrees                    /* nhalos_per_tree */
+            + offset*sizeof(struct lhalotree);
+        
+        int pread_status = pread_single_lhalotree_with_offset(fd, third, nhalos, tree_offset);
+        if(pread_status != EXIT_SUCCESS) {
+            fprintf(stderr,"Error: Could not read tree = %d with %d halos\n",itree, nhalos);
+            return EXIT_FAILURE;
+        }
+        for(int i=0;i<nhalos;i++) {
+            if( third[i].FirstProgenitor != -1 && (third[i].FirstProgenitor < 0 || third[i].FirstProgenitor >= nhalos)) {            
+                /* fprintf(stderr,"In tree=%d, halo=%d has Mvir = %lf and MostBoundID = %lld\n", itree, i, halo.Mvir, halo.MostBoundID); */
+                fprintf(stderr,"HERE:Error: halonum = %d with FirstProg = %d has invalid value. Should be within [0, %d)\n",i,
+                        third[i].FirstProgenitor, nhalos);
+                return EXIT_FAILURE;                
+            }
+        }
+        const int test_sort = 1;
+        int sort_status = sort_lhalotree_in_snapshot_and_fof_groups(third, nhalos, test_sort);
+        if(sort_status != EXIT_SUCCESS) {
+            fprintf(stderr,"ERROR: Validation FAILED. itree = %d does not correspond to the original tree\n", itree);
+            free(third);
+            exit_status |= sort_status << 24;
+            goto fail;
+            /* break; */
+        }
+        free(third);
+        offset += nhalos;
+    }
+    finish_myprogressbar(&interrupted);
     
     
     /* My first goto statement -- MS: 3rd Nov, 2016.
@@ -105,6 +150,7 @@ fail:
     free(first);
     free(nhalos_per_tree);
     free(all_trees);
+    close(fd);
     
     return exit_status;
 }    
