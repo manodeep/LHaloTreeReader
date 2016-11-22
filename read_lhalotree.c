@@ -170,15 +170,15 @@ int sort_lhalotree_in_snapshot_and_fof_groups(struct lhalotree *tree, const int6
         fprintf(stderr,"Error: nhalos=%"PRId64" can not be larger than INT_MAX=%d\n", nhalos, INT_MAX);
         return EXIT_FAILURE;
     }
-    float *prog_mass=NULL, *desc_mass=NULL;
+    int32_t *prog_len=NULL, *desc_len=NULL;
     int32_t *len=NULL, *foflen=NULL;
     if(test > 0) {
-        prog_mass = my_malloc(sizeof(*prog_mass), nhalos);
-        desc_mass = my_malloc(sizeof(*prog_mass), nhalos);
+        prog_len = my_malloc(sizeof(*prog_len), nhalos);
+        desc_len = my_malloc(sizeof(*prog_len), nhalos);
         len = my_malloc(sizeof(*len), nhalos);
         foflen = my_malloc(sizeof(*foflen), nhalos);
 
-        if(prog_mass == NULL || desc_mass == NULL || len == NULL || foflen == NULL ) {
+        if(prog_len == NULL || desc_len == NULL || len == NULL || foflen == NULL ) {
             fprintf(stderr,"Warning: malloc failure for LHalotree fields - disabling tests even though tests were requested\n");
             test = 0;
         }
@@ -206,27 +206,27 @@ int sort_lhalotree_in_snapshot_and_fof_groups(struct lhalotree *tree, const int6
             }
             foflen[i] = tree[tree[i].FirstHaloInFOFgroup].Len;
             if(tree[i].FirstProgenitor == -1 || (tree[i].FirstProgenitor >= 0 && tree[i].FirstProgenitor < nhalos)) {
-                prog_mass[i] = tree[i].FirstProgenitor == -1 ? -1.0:tree[tree[i].FirstProgenitor].Mvir;
+                prog_len[i] = tree[i].FirstProgenitor == -1 ? -1:tree[tree[i].FirstProgenitor].Len;
             } else {
                 fprintf(stderr,"Error. In %s: halonum = %d with FirstProg = %d has invalid value. Should be within [0, %"PRId64")\n",
                         __FUNCTION__,i,tree[i].FirstProgenitor, nhalos);
                 return EXIT_FAILURE;
             }
-            desc_mass[i] = tree[i].Descendant == -1 ? -1.0:tree[tree[i].Descendant].Mvir;
+            desc_len[i] = tree[i].Descendant == -1 ? -1:tree[tree[i].Descendant].Len;
         }
     }
 
-    
     /* Sort on snapshots, then sort on FOF groups, then ensure FOF halo comes first within group, then sort by subhalo mass  */
-#define SNAPNUM_FOFHALO_MVIR_COMPARATOR(x, i, j)    ((x[i].SnapNum != x[j].SnapNum) ? (x[j].SnapNum - x[i].SnapNum):FOFHALO_MVIR_COMPARATOR(x, i, j))
-#define FOFHALO_MVIR_COMPARATOR(x, i, j) ((x[i].FirstHaloInFOFgroup != x[j].FirstHaloInFOFgroup) ? (x[x[j].FirstHaloInFOFgroup].Mvir - x[x[i].FirstHaloInFOFgroup].Mvir):FOF_SUBMVIR_COMPARATOR(x,i, j))
-#define FOF_SUBMVIR_COMPARATOR(x, i, j)     ((x[i].FirstHaloInFOFgroup == i) ? -1:( (x[j].FirstHaloInFOFgroup == j) ? 1: (x[j].Mvir - x[i].Mvir)) )
+#define SNAPNUM_FOFHALO_MVIR_COMPARATOR(x, i, j)    ((x[i].SnapNum != x[j].SnapNum) ? (x[j].SnapNum - x[i].SnapNum):FOFHALO_COMPARATOR(x, i, j))
+#define FOFHALO_COMPARATOR(x, i, j) ((x[i].FirstHaloInFOFgroup != x[j].FirstHaloInFOFgroup) ? (x[i].FirstHaloInFOFgroup - x[j].FirstHaloInFOFgroup):FOFHALO_SUBLEN_COMPARATOR(x,i, j))
+
+#define FOFHALO_SUBLEN_COMPARATOR(x, i, j)     ((x[i].FirstHaloInFOFgroup == index[i]) ? -1:( (x[j].FirstHaloInFOFgroup == index[j]) ? 1: (x[j].Len - x[i].Len)) )
     
 #define MULTIPLE_ARRAY_EXCHANGER(type,a,i,j) {                          \
         SGLIB_ARRAY_ELEMENTS_EXCHANGER(struct lhalotree, tree,i,j);     \
         SGLIB_ARRAY_ELEMENTS_EXCHANGER(int32_t, index, i, j);           \
     }
-    
+
     SGLIB_ARRAY_HEAP_SORT_MULTICOMP(struct lhalotree, tree, nhalos, SNAPNUM_FOFHALO_MVIR_COMPARATOR, MULTIPLE_ARRAY_EXCHANGER);
     
 #undef SNAPNUM_FOFHALO_MVIR_COMPARATOR
@@ -286,16 +286,16 @@ int sort_lhalotree_in_snapshot_and_fof_groups(struct lhalotree *tree, const int6
 
             int32_t desc = tree[i].Descendant;
             if(desc == -1) {
-                if(desc_mass[old_index] != -1.0){
-                    fprintf(stderr,"Error: tree[%d].descendant = %d (should be -1) now but old descendant mass = %f\n",
-                            i, tree[i].Descendant, desc_mass[old_index]);
+                if(desc_len[old_index] != -1){
+                    fprintf(stderr,"Error: tree[%d].descendant = %d (should be -1) now but old descendant contained %d particles\n",
+                            i, tree[i].Descendant, desc_len[old_index]);
                     return EXIT_FAILURE;
                 }
             } else {
                 assert(desc >= 0 && desc < nhalos);
-                if(desc_mass[old_index] != tree[desc].Mvir) {
-                    fprintf(stderr,"Error: tree[%d].Descendant (Mvir) = %f (desc=%d) now but old descendant mass = %f\n",
-                            i, tree[desc].Mvir, desc, desc_mass[old_index]);
+                if(desc_len[old_index] != tree[desc].Len) {
+                    fprintf(stderr,"Error: tree[%d].Descendant (Len) = %d (desc=%d) now but old descendant contained %d particles\n",
+                            i, tree[desc].Len, desc, desc_len[old_index]);
                     return EXIT_FAILURE;
                 }
             }
@@ -303,9 +303,9 @@ int sort_lhalotree_in_snapshot_and_fof_groups(struct lhalotree *tree, const int6
 
             int32_t prog = tree[i].FirstProgenitor;
             if(prog == -1) {
-                if(prog_mass[old_index] != -1.0){
-                    fprintf(stderr,"Error: tree[%d].FirstProgenitor = %d (should be -1) now but old FirstProgenitor mass = %f\n",
-                            i, tree[i].FirstProgenitor, desc_mass[old_index]);
+                if(prog_len[old_index] != -1){
+                    fprintf(stderr,"Error: tree[%d].FirstProgenitor = %d (should be -1) now but old FirstProgenitor contained %d particles\n",
+                            i, tree[i].FirstProgenitor, desc_len[old_index]);
                     return EXIT_FAILURE;
                 }
             } else {
@@ -313,16 +313,47 @@ int sort_lhalotree_in_snapshot_and_fof_groups(struct lhalotree *tree, const int6
                     fprintf(stderr,"WEIRD: prog = %d for i=%d is not within [0, %"PRId64")\n",prog, i, nhalos);
                 }
                 assert(prog >=0 && prog < nhalos);
-                if(prog_mass[old_index] != tree[prog].Mvir) {
-                    fprintf(stderr,"Error: tree[%d].FirstProgenitor (Mvir) = %f (prog=%d) now but old FirstProgenitor mass = %f\n",
-                            i, tree[prog].Mvir, prog, prog_mass[old_index]);
+                if(prog_len[old_index] != tree[prog].Len) {
+                    fprintf(stderr,"Error: tree[%d].FirstProgenitor (Len) = %d (prog=%d) now but old FirstProgenitor contained %d particles\n",
+                            i, tree[prog].Len, prog, prog_len[old_index]);
                     return EXIT_FAILURE;
                 }
             }
         }
 
+        /* Check that the first halo is a fof */
+        if(tree[0].FirstHaloInFOFgroup != 0) {
+            fprintf(stderr,"Error: The first halo should be an FOF halo and point to itself but it points to %d\n", tree[0].FirstHaloInFOFgroup);
+            return EXIT_FAILURE;
+        }
+        
+        /* Now check that all halos associated with a FOF come as a bunch (and are never referred to elsewhere via the FirstHaloInFOFgroup*/
+        int64_t start_fofindex = 0;
+        while(start_fofindex < nhalos) {
+            int64_t end_fofindex;
+            for(end_fofindex=start_fofindex + 1;end_fofindex < nhalos; end_fofindex++) {
+                if(tree[end_fofindex].FirstHaloInFOFgroup == end_fofindex) break;
+            }
+
+            /* Now loop over all halos and make sure the only indices that refer to FirstHaloInFOFgroup are within [start_fofindex, end_fofindex )*/
+            for(int32_t i=0;i<nhalos;i++) {
+                if(tree[i].FirstHaloInFOFgroup == start_fofindex) {
+                    if(i >= start_fofindex && i < end_fofindex) {
+                        continue;
+                    }
+
+                    fprintf(stderr,"Error: Expected FOF to come first and then *all* subhalos associated with that FOF halo\n");
+                    fprintf(stderr,"Result truth condition would be for all (FOF+sub) halos to be contained within indices [%"PRId64", %"PRId64") \n",
+                            start_fofindex, end_fofindex);
+                    fprintf(stderr,"However, tree[%d].FirstHaloInFOFgroup = %d violates this truth condition\n", i, tree[i].FirstHaloInFOFgroup);
+                    return EXIT_FAILURE;
+                }
+            }
+            start_fofindex = end_fofindex;
+        }
+
         free(index_for_old_order);
-        free(prog_mass); free(desc_mass);
+        free(prog_len); free(desc_len);
         free(len);free(foflen);
     }
     free(index);
