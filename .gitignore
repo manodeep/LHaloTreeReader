@@ -22,6 +22,7 @@
 
 # Executables
 read_lhalotree
+examples/find_flybys
 *.exe
 *.out
 *.app

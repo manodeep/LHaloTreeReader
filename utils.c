@@ -45,7 +45,7 @@ size_t my_fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
     nread = fread(ptr, size, nmemb, stream);
     if(nread != nmemb) {
         fprintf(stderr,"I/O error (fread) has occured.\n");
-        fprintf(stderr,"Instead of reading nmemb=%zu, I got nread = %zu ..exiting\n",nmemb,nread);
+        fprintf(stderr,"Instead of reading nmemb=%zu with size=%zu, I got nread = %zu ..exiting\n",nmemb, size, nread);
         perror(NULL);
         exit(EXIT_FAILURE);
     }
