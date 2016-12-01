@@ -32,24 +32,28 @@ int pread_single_lhalotree_with_offset(int fd, struct lhalotree *tree, const int
 {
     size_t bytes_to_read = sizeof(*tree) * nhalos;
     ssize_t bytes_left = bytes_to_read;
-    size_t curr_offset=0;
+    char *tree_ptr = (char *) tree;
+    size_t totnbytes_read=0;
     while(bytes_left > 0) {
-        ssize_t bytes_read = pread(fd, tree + curr_offset, bytes_left, offset);
+        ssize_t bytes_read = pread(fd, tree_ptr, bytes_left, offset);
         if(bytes_read < 0) {
             fprintf(stderr,"Read error\n");
             perror(NULL);
             return -1;
         }
         offset += bytes_read;
-        curr_offset += bytes_read/sizeof(*tree);
+        tree_ptr += (size_t) bytes_read;
         bytes_left -= bytes_read;
+        totnbytes_read += bytes_read;
     }
 
     /* I could return bytes_to_read but returning this serves as an independent check that
        too much data was not read. 
      */
 
-    if((curr_offset * sizeof(*tree)) != bytes_to_read) {
+    if(totnbytes_read != bytes_to_read) {
+        fprintf(stderr,"Incorrect read in %s>. Expected to read = %zu bytes but read %zu bytes instead (bytes_left = %zd)\n",
+                __FUNCTION__, bytes_to_read, totnbytes_read, bytes_left);
         return -1;
     }
     
@@ -70,6 +74,7 @@ int read_file_headers_lhalotree(const char *filename, int32_t *ntrees, int32_t *
     }
     *nhalos_per_tree = my_malloc(sizeof(**nhalos_per_tree), (uint64_t) *ntrees);
     if(*nhalos_per_tree == NULL) {
+        fprintf(stderr,"malloc failed for array containing nhalos per tree. ntrees = %d. requested size = %zu \n", *ntrees, sizeof(**nhalos_per_tree) * (*ntrees));
         status = EXIT_FAILURE;
     } else {
         my_fread(*nhalos_per_tree, sizeof(**nhalos_per_tree), *ntrees, fp);
