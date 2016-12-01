@@ -29,6 +29,7 @@ int main(int argc, char **argv)
     struct lhalotree *tree = NULL;
     int32_t *nhalos_per_tree=NULL;
     int fd, status=EXIT_FAILURE;
+    FILE *fp=NULL;
     
     for(int iarg=1;iarg<argc;iarg++) {
         char *filename = argv[iarg];
@@ -53,7 +54,7 @@ int main(int argc, char **argv)
         fprintf(stderr,"Reading from file `%s'...\n", filename);
         char buf[MAXLEN];
         my_snprintf(buf, MAXLEN, "%s_fofs_last_snap",filename);
-        FILE *fp=fopen(buf,"w");
+        fp=fopen(buf,"w");
         if(fp == NULL) {
             fprintf(stderr,"Could not open file `%s'\n",filename);
             goto fail;
@@ -107,16 +108,23 @@ int main(int argc, char **argv)
             tree=NULL;
         }
         fclose(fp);
+        fp=NULL;
         free(nhalos_per_tree);
         nhalos_per_tree=NULL;
         finish_myprogressbar(&interrupted);
+        close(fd);
+        fd = -1;
     }
 
 fail:
     free(nhalos_per_tree);
     free(tree);
-    close(fd);
-    
+    if(fd > 0) {
+        close(fd);
+    }
+    if(fp != NULL) {
+        fclose(fp);
+    }
     return status;
 }    
 
