@@ -43,17 +43,19 @@ int main(int argc, char **argv)
             status = fd;
             goto fail;
         }
+
         status = read_file_headers_lhalotree(filename, &ntrees, &totnhalos, &nhalos_per_tree);
         if(status != EXIT_SUCCESS) {
             goto fail;
-        }
-        
+        } 
+
         size_t offset = 0;
         fprintf(stderr,"Reading from file `%s'...\n", filename);
         char buf[MAXLEN];
         my_snprintf(buf, MAXLEN, "%s_fofs_last_snap",filename);
-        FILE *fp=my_fopen(buf,"w");
+        FILE *fp=fopen(buf,"w");
         if(fp == NULL) {
+            fprintf(stderr,"Could not open file `%s'\n",filename);
             goto fail;
         }
 
@@ -62,6 +64,10 @@ int main(int argc, char **argv)
             my_progressbar(itree, &interrupted);
             const int32_t nhalos = nhalos_per_tree[itree];
             tree  = my_malloc(sizeof(*tree), nhalos);
+            if(tree == NULL) {
+                fprintf(stderr,"malloc failed for tree with nhalos = %d\n", nhalos);
+                goto fail;
+            }
             const size_t offset_for_tree =  sizeof(int32_t) /* ntrees */
                 + sizeof(int32_t)                           /* totnhalos */
                 + sizeof(int32_t)*ntrees                    /* nhalos_per_tree */
@@ -70,6 +76,7 @@ int main(int argc, char **argv)
             /* Read a single tree */
             status = pread_single_lhalotree_with_offset(fd, tree, nhalos, offset_for_tree);
             if(status != EXIT_SUCCESS) {
+                fprintf(stderr,"pread failed\n");
                 goto fail;
             }
 

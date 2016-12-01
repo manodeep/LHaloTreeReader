@@ -7,7 +7,7 @@ INCL := $(ROOT_DIR)/read_lhalotree.h $(ROOT_DIR)/utils.h $(ROOT_DIR)/sglib.h $(R
 INCLUDE := -I$(ROOT_DIR)
 # Compiling to object
 CC := gcc
-CFLAGS := -Wall -Wextra -std=c99 -Wshadow -fno-strict-aliasing -g -D_POSIX_SOURCE=200809L -D_GNU_SOURCE -D_DARWIN_C_SOURCE 
+CFLAGS := -Wall -Wextra -std=gnu11 -m64 -Wshadow -fno-strict-aliasing -g -D_POSIX_SOURCE=200809L -D_GNU_SOURCE -D_DARWIN_C_SOURCE 
 CFLAGS  += -Wformat=2  -Wpacked  -Wnested-externs -Wpointer-arith  -Wredundant-decls  -Wfloat-equal -Wcast-qual -Wpadded
 CFLAGS  +=  -Wcast-align -Wmissing-declarations -Wmissing-prototypes
 CFLAGS  += -Wnested-externs -Wstrict-prototypes 
