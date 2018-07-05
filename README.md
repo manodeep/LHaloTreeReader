@@ -14,6 +14,7 @@ indices can either be `-1`, or in the inclusive range [0, 999].
 3. `NextProgenitor`  -- Is attached to the `FirstProgenitor` halo and tracks the
    other progenitors. Can be in the past/present/future of `FirstProgenitor`,
    depending on if any one of the halos skip snapshots. 
+   
    **NOTE**
    `NextProgenitor` of any given halo (i.e., the `Descendant`) is stored in the `FirstProgenitor` of
    that halo. Is equal to `-1` when there are no more progenitors. 
