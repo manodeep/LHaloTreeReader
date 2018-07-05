@@ -92,12 +92,12 @@ struct lhalotree * read_entire_lhalotree(const char *filename, int32_t *ntrees, 
     /*
       A simple reader (with error-checking) for standard LHaloTree binary files
 
-      Bytes per element            |   Nelements             | Field
-      -----------------------------|-------------------------|------------------------
-      4 bytes                      |   1                     | ntrees     (number of trees in this file)
-      4 bytes                      |   1                     | totnhalos  (total number of halos summer over all trees in this file)
-      4 bytes                      |   ntrees                | nhalos_per_tree (number of halos in *each* tree in this file)
-      sizeof(struct lhalotree)  |   totnhalos             | all_trees   (all the halos in this file, should be parsed one tree at a time)
+      Bytes per element        |     Datatype       |   Nelements             | Field
+      -------------------------|--------------------|-------------------------|------------------------
+      4 bytes                  | unsigned int32_t   |   1                     | ntrees     (number of trees in this file)
+      4 bytes                  | unsigned int32_t   |   1                     | totnhalos  (total number of halos summed over all trees in this file)
+      4 bytes                  | unsigned int32_t   |   ntrees                | nhalos_per_tree (number of halos in *each* tree in this file)
+      sizeof(struct lhalotree) | struct lhalotree   |   totnhalos             | all_trees   (all the halos in this file, should be parsed one tree at a time)
 
      */
 
