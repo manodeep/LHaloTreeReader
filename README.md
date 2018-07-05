@@ -17,7 +17,7 @@ indices can either be `-1`, or in the inclusive range [0, 999].
    
    **NOTE**
    `NextProgenitor` of any given halo (i.e., the `Descendant`) is stored in the `FirstProgenitor` of
-   the (`Descendant`) halo. The following 
+   the (`Descendant`) halo. The following code shows how to process all progenitors of any given halo:
    
 ```c
    /* 
