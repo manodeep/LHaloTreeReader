@@ -1,5 +1,16 @@
 # LHaloTreeReader
-A skeleton C code to read LHaloTree output
+A skeleton C code to read LHaloTree output. The LHaloTree is a binary file format, where the tree data for the entire simulation tree data can be split across many files. Each file contains the following fields:
+
+```
+      Bytes per element        |     Datatype       |   Nelements             | Field
+      -------------------------|--------------------|-------------------------|------------------------
+      4 bytes                  | unsigned int32_t   |   1                     | ntrees     (number of trees in this file)
+      4 bytes                  | unsigned int32_t   |   1                     | totnhalos  (total number of halos summed over all trees in this file)
+      4 bytes                  | unsigned int32_t   |   ntrees                | nhalos_per_tree (number of halos in *each* tree in this file)
+      sizeof(struct lhalotree) | struct lhalotree   |   totnhalos             | all_trees   (all the halos in this file, should be parsed one tree at a time)
+```
+See these lines in [lhalotree.h](https://github.com/manodeep/LHaloTreeReader/blob/master/lhalotree.h#L9-L33) for the definition of `struct lhalotree`. A single tree will *always* be fully contained within one file, i.e., tree data does not split across multiple files.
+
 
 # LHaloTree Structure
 There are 5 indices to navigate around LHaloTree mergertrees. A value of `-1`
